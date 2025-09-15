@@ -122,30 +122,30 @@ function groupScoreByPlayer(scoreRows){
 }
 
 /* チーム構築 */
+/* チーム構築（スコア入力優先版） */
 function buildTeams(teamRows,scoreMap){
   const hdr=teamRows[0]||[];
   const id=headerIndexMap(hdr);
   const rows=teamRows.slice(1).filter(r=>(r[id.team]||'').trim().length);
   return rows.map(r=>{
     const val=k=>typeof k==='number'?r[k]:'';
-    const num=k=>{
-      const n=parseFloat((val(k)||'').replace(/[^\d.+\-]/g,''));
-      return isNaN(n)?0:n;
-    };
     const players=[];
     const p=[id.p1,id.p2,id.p3,id.p4];
-    const s=[id.s1,id.s2,id.s3,id.s4];
+
+    // 各選手の点数は「スコア入力」由来（scoreMap）のみを使う
     for(let k=0;k<4;k++){
-      const name=val(p[k]); if(!name)continue;
-      let sc=num(s[k]);
-      if((!sc||isNaN(sc))&&scoreMap&&scoreMap.has(name)) sc=scoreMap.get(name);
-      players.push({name,score:sc||0});
+      const name=val(p[k]);
+      if(!name) continue;
+      const sc=(scoreMap && scoreMap.has(name)) ? scoreMap.get(name) : 0;
+      players.push({name,score:sc});
     }
-    let total=num(id.total);
-    if(!total) total=players.reduce((a,b)=>a+b.score,0);
+
+    // 合計も必ず players の合計から計算（手入力列は見ない）
+    const total=players.reduce((a,b)=>a+b.score,0);
     return {name:val(id.team),manager:val(id.mgr),players,total};
   });
 }
+
 
 /* 描画 */
 function renderRank(ts){
