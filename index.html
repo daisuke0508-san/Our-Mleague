@@ -43,19 +43,163 @@
 </div>
 
 <script>
-const TEAM_CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRBooKDm5BOsRo-C0cGo7A4eYSqyE0M10COhOq1JxLSWe6Gh56yuv6nH2nB4meHjA/pub?gid=13413896&single=true&output=csv";const SCORE_CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRBooKDm5BOsRo-C0cGo7A4eYSqyE0M10COhOq1JxLSWe6Gh56yuv6nH2nB4meHjA/pub?gid=671232666&single=true&output=csv";
-const TEAM_COLORS={"大輔チーム":"#2a7cff","しげチーム":"#36b24a","まぎチーム":"#e0b300","もりチーム":"#ff8a3d","マサキングチーム":"#ff5db1","野島ケータチーム":"#9b7cff"};
-const fmt=n=>(n>0?'+':'')+(Math.round(n*10)/10).toFixed(1);const cls=n=>n>=0?'pos':'neg';
-function parseCSV(t){const r=[];const L=t.replace(/\r/g,'').split('\n').filter(x=>x.trim().length);for(let l of L){const o=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(ch=='"'){if(q&&l[i+1]=='"'){c+='"';i++;}else q=!q;}else if(ch===','&&!q){o.push(c);c='';}else c+=ch;}o.push(c);r.push(o);}return r;}
-async function fetchCSV(u){const res=await fetch(u,{cache:'no-store'});if(!res.ok)throw new Error('CSV fetch failed');return parseCSV(await res.text());}
-function headerIndexMap(h){const i={};h.forEach((v,k)=>{const s=(v||'').replace(/\s/g,'');if(!s)return;if(/^(チーム名)$/i.test(s))i.team=k;if(/^(監督|監督（友人名）)$/i.test(s))i.mgr=k;if(/^選手[①1]$/i.test(s))i.p1=k;if(/^スコア[①1]$/i.test(s))i.s1=k;if(/^選手[②2]$/i.test(s))i.p2=k;if(/^スコア[②2]$/i.test(s))i.s2=k;if(/^選手[③3]$/i.test(s))i.p3=k;if(/^スコア[③3]$/i.test(s))i.s3=k;if(/^選手[④4]$/i.test(s))i.p4=k;if(/^スコア[④4]$/i.test(s))i.s4=k;if(/^(合計|合計点)$/i.test(s))i.total=k;});return i;}
-function groupScoreByPlayer(scoreRows){const m=new Map();const H=scoreRows[0]||[];const col={name:-1,pt:-1};H.forEach((v,k)=>{const s=(v||'').replace(/\s/g,'');if(/^(選手名)$/i.test(s))col.name=k;if(/^(得点)$/i.test(s))col.pt=k;});scoreRows.slice(1).forEach(r=>{const name=r[col.name];const pt=parseFloat((r[col.pt]||'').replace(/[^\d.+-]/g,''));if(!name||isNaN(pt))return;m.set(name,(m.get(name)||0)+pt);});return m;}
-function buildTeams(teamRows,scoreMap){const hdr=teamRows[0]||[];const id=headerIndexMap(hdr);const rows=teamRows.slice(1).filter(r=>(r[id.team]||'').trim().length);return rows.map(r=>{function val(k){return typeof k==='number'?r[k]:''}function num(k){const n=parseFloat((val(k)||'').replace(/[^\d.+-]/g,''));return isNaN(n)?0:n}const players=[];const p=[id.p1,id.p2,id.p3,id.p4];const s=[id.s1,id.s2,id.s3,id.s4];for(let k=0;k<4;k++){const name=val(p[k]);if(!name)continue;let sc=num(s[k]);if((!sc||isNaN(sc))&&scoreMap&&scoreMap.has(name))sc=scoreMap.get(name);players.push({name,score:sc||0});}let total=num(id.total);if(!total)total=players.reduce((a,b)=>a+b.score,0);return {name:val(id.team),manager:val(id.mgr),players,total};});}
-function renderRank(ts){const tb=document.querySelector('#rankTbl tbody');tb.innerHTML='';[...ts].sort((a,b)=>b.total-a.total).forEach((t,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td><span class="teamchip">${t.name}</span></td><td class="score ${cls(t.total)}">${fmt(t.total)}</td>`;tb.appendChild(tr);});}
-function renderTabs(ts){const tabs=document.getElementById('teamTabs');tabs.innerHTML='';const all=document.createElement('button');all.className='tab active';all.textContent='全チーム';all.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));all.classList.add('active');renderCards(ts);};tabs.appendChild(all);ts.forEach(t=>{const b=document.createElement('button');b.className='tab';b.textContent=t.name;b.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));b.classList.add('active');renderCards([t]);};tabs.appendChild(b);});}
-function renderCards(ts){const w=document.getElementById('cards');w.innerHTML='';ts.forEach(t=>{const card=document.createElement('div');card.className='card';card.innerHTML=`<h3>■ <span>${t.name}</span> <span class="pill">監督: ${t.manager||''}</span></h3>`+t.players.map(p=>`<div class="row"><div>${p.name}</div><div class="score ${cls(p.score)}">${fmt(p.score)}</div></div>`).join('')+`<div class="row"><div><strong>合計</strong></div><div class="score ${cls(t.total)}"><strong>${fmt(t.total)}</strong></div></div>`;w.appendChild(card);});}
-async function bootstrap(){try{const [teamRows,scoreRows]=await Promise.all([fetchCSV(TEAM_CSV_URL),fetchCSV(SCORE_CSV_URL).catch(()=>[[]])]);const scoreMap=(scoreRows&&scoreRows.length>1)?groupScoreByPlayer(scoreRows):null;const teams=buildTeams(teamRows,scoreMap);renderRank(teams);renderTabs(teams);renderCards(teams);document.getElementById('updatedAt').textContent=new Date().toLocaleString();}catch(e){console.error(e);document.getElementById('updatedAt').textContent='読み込み失敗';}}
-document.getElementById('reloadBtn').addEventListener('click',bootstrap);bootstrap();
+/* ====== 設定（あなたのCSV公開URL） ====== */
+const TEAM_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRBooKDm5BOsRo-C0cGo7A4eYSqyE0M10COhOq1JxLSWe6Gh56yuv6nH2nB4meHjA/pub?gid=13413896&single=true&output=csv';
+const SCORE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRBooKDm5BOsRo-C0cGo7A4eYSqyE0M10COhOq1JxLSWe6Gh56yuv6nH2nB4meHjA/pub?gid=671232666&single=true&output=csv';
+
+/* チーム色（任意） */
+const TEAM_COLORS={
+  "大輔チーム":"#2a7cff","しげチーム":"#36b24a","まぎチーム":"#e0b300",
+  "もりチーム":"#ff8a3d","マサキングチーム":"#ff5db1","野島ケータチーム":"#9b7cff"
+};
+
+/* 表示ユーティリティ */
+const fmt = n => (n>0?'+':'')+(Math.round(n*10)/10).toFixed(1);
+const cls = n => n>=0 ? 'pos' : 'neg';
+
+/* ====== 追加：キャッシュバスター ====== */
+const withBust = u => u + (u.includes('?') ? '&' : '?') + 'v=' + Date.now();
+
+/* CSV パース＆取得 */
+function parseCSV(t){
+  const r=[]; const L=t.replace(/\r/g,'').split('\n').filter(x=>x.trim().length);
+  for(let l of L){
+    const o=[]; let c='',q=false;
+    for(let i=0;i<l.length;i++){
+      const ch=l[i];
+      if(ch=='"'){ if(q&&l[i+1]=='"'){c+='"';i++;} else q=!q; }
+      else if(ch===','&&!q){ o.push(c); c=''; }
+      else c+=ch;
+    }
+    o.push(c); r.push(o);
+  }
+  return r;
+}
+async function fetchCSV(u){
+  const res = await fetch(withBust(u), {cache:'no-store'});
+  if(!res.ok) throw new Error('CSV fetch failed: '+u);
+  return parseCSV(await res.text());
+}
+
+/* ヘッダー→列インデックス */
+function headerIndexMap(h){
+  const i={};
+  h.forEach((v,k)=>{
+    const s=(v||'').replace(/\s/g,'');
+    if(!s)return;
+    if(/^(チーム名)$/i.test(s)) i.team=k;
+    if(/^(監督|監督（友人名）)$/i.test(s)) i.mgr=k;
+    if(/^選手[①1]$/i.test(s)) i.p1=k;
+    if(/^スコア[①1]$/i.test(s)) i.s1=k;
+    if(/^選手[②2]$/i.test(s)) i.p2=k;
+    if(/^スコア[②2]$/i.test(s)) i.s2=k;
+    if(/^選手[③3]$/i.test(s)) i.p3=k;
+    if(/^スコア[③3]$/i.test(s)) i.s3=k;
+    if(/^選手[④4]$/i.test(s)) i.p4=k;
+    if(/^スコア[④4]$/i.test(s)) i.s4=k;
+    if(/^(合計|合計点)$/i.test(s)) i.total=k;
+  });
+  return i;
+}
+
+/* スコア入力CSV → 選手別合計マップ */
+function groupScoreByPlayer(scoreRows){
+  const m=new Map();
+  const H=scoreRows[0]||[];
+  const col={name:-1,pt:-1};
+  H.forEach((v,k)=>{
+    const s=(v||'').replace(/\s/g,'');
+    if(/^(選手名)$/i.test(s)) col.name=k;
+    if(/^(得点)$/i.test(s))   col.pt=k;
+  });
+  scoreRows.slice(1).forEach(r=>{
+    const name=r[col.name];
+    const pt=parseFloat((r[col.pt]||'').replace(/[^\d.+\-]/g,''));
+    if(!name||isNaN(pt))return;
+    m.set(name,(m.get(name)||0)+pt);
+  });
+  return m;
+}
+
+/* チーム構築 */
+function buildTeams(teamRows,scoreMap){
+  const hdr=teamRows[0]||[];
+  const id=headerIndexMap(hdr);
+  const rows=teamRows.slice(1).filter(r=>(r[id.team]||'').trim().length);
+  return rows.map(r=>{
+    const val=k=>typeof k==='number'?r[k]:'';
+    const num=k=>{
+      const n=parseFloat((val(k)||'').replace(/[^\d.+\-]/g,''));
+      return isNaN(n)?0:n;
+    };
+    const players=[];
+    const p=[id.p1,id.p2,id.p3,id.p4];
+    const s=[id.s1,id.s2,id.s3,id.s4];
+    for(let k=0;k<4;k++){
+      const name=val(p[k]); if(!name)continue;
+      let sc=num(s[k]);
+      if((!sc||isNaN(sc))&&scoreMap&&scoreMap.has(name)) sc=scoreMap.get(name);
+      players.push({name,score:sc||0});
+    }
+    let total=num(id.total);
+    if(!total) total=players.reduce((a,b)=>a+b.score,0);
+    return {name:val(id.team),manager:val(id.mgr),players,total};
+  });
+}
+
+/* 描画 */
+function renderRank(ts){
+  const tb=document.querySelector('#rankTbl tbody'); tb.innerHTML='';
+  [...ts].sort((a,b)=>b.total-a.total).forEach((t,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td>
+      <td><span class="teamchip" style="background:${TEAM_COLORS[t.name]||'transparent'}22;border-color:${TEAM_COLORS[t.name]||'var(--border)'}">${t.name}</span></td>
+      <td class="score ${cls(t.total)}">${fmt(t.total)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+function renderTabs(ts){
+  const tabs=document.getElementById('teamTabs'); tabs.innerHTML='';
+  const all=document.createElement('button'); all.className='tab active'; all.textContent='全チーム';
+  all.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));all.classList.add('active');renderCards(ts);};
+  tabs.appendChild(all);
+  ts.forEach(t=>{
+    const b=document.createElement('button'); b.className='tab'; b.textContent=t.name;
+    b.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));b.classList.add('active');renderCards([t]);};
+    tabs.appendChild(b);
+  });
+}
+function renderCards(ts){
+  const w=document.getElementById('cards'); w.innerHTML='';
+  ts.forEach(t=>{
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`<h3>■ <span>${t.name}</span> <span class="pill">監督: ${t.manager||''}</span></h3>`
+      + t.players.map(p=>`<div class="row"><div>${p.name}</div><div class="score ${cls(p.score)}">${fmt(p.score)}</div></div>`).join('')
+      + `<div class="row"><div><strong>合計</strong></div><div class="score ${cls(t.total)}"><strong>${fmt(t.total)}</strong></div></div>`;
+    w.appendChild(card);
+  });
+}
+
+/* 起動 */
+async function bootstrap(){
+  try{
+    const [teamRows,scoreRows] = await Promise.all([
+      fetchCSV(TEAM_CSV_URL),
+      fetchCSV(SCORE_CSV_URL).catch(()=>[[]])
+    ]);
+    const scoreMap=(scoreRows&&scoreRows.length>1)?groupScoreByPlayer(scoreRows):null;
+    const teams=buildTeams(teamRows,scoreMap);
+    renderRank(teams); renderTabs(teams); renderCards(teams);
+    document.getElementById('updatedAt').textContent=new Date().toLocaleString();
+  }catch(e){
+    console.error(e);
+    document.getElementById('updatedAt').textContent='読み込み失敗';
+  }
+}
+document.getElementById('reloadBtn').addEventListener('click',bootstrap);
+bootstrap();
+
+/* 10分ごと再取得 & 23:50にページ自体を再読込 */
 setInterval(bootstrap,10*60*1000);
 setInterval(()=>{const d=new Date();if(d.getHours()===23&&d.getMinutes()===50) location.reload();},30*1000);
 </script>
