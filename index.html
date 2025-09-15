@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>勝手にMリーグ｜ダッシュボード（自動更新版）</title>
+  <style>
+    :root{--bg:#0f0f12;--panel:#17171b;--ink:#fafafa;--muted:#a8a8b3;--green:#1fbf64;--red:#ff5c5c;--card:#1c1c21;--border:#2a2a31}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Noto Sans JP","Hiragino Sans",Roboto,Arial}
+    header{position:sticky;top:0;background:#121216;padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;z-index:1}
+    h1{font-size:16px;margin:0}.sub{font-size:12px;color:var(--muted)}
+    .wrap{padding:12px;max-width:980px;margin:0 auto}
+    .leader{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:12px}
+    .leader .head{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;text-align:left}th{color:var(--muted);font-weight:600}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}.tab{padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--ink);font-size:13px}.tab.active{background:var(--panel)}
+    .grid{display:grid;grid-template-columns:1fr;gap:10px}@media(min-width:780px){.grid{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}.card h3{margin:0 0 8px 0;font-size:15px}
+    .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px dashed var(--border)}.row:first-of-type{border-top:none}
+    .score{font-variant-numeric:tabular-nums}.pos{color:var(--green)}.neg{color:var(--red)}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--border);font-size:12px;color:var(--muted)}
+    .teamchip{display:inline-block;padding:2px 8px;border-radius:8px;margin-right:6px;font-size:12px;border:1px solid var(--border)}
+    .foot{margin-top:8px;color:var(--muted);font-size:12px}
+    .btn{padding:8px 10px;border:1px solid var(--border);background:transparent;color:var(--ink);border-radius:8px}
+  </style>
+</head>
+<body>
+<header>
+  <div><h1>勝手にMリーグ ダッシュボード</h1><div class="sub">スマホ最適・CSV自動連動（自動更新ON）</div></div>
+  <div style="margin-left:auto;display:flex;gap:8px;"><button id="reloadBtn" class="btn">今すぐ更新</button></div>
+</header>
+
+<div class="wrap">
+  <div class="leader">
+    <div class="head"><div>📊 チーム順位</div><div class="pill" id="updatedAt">読み込み中…</div></div>
+    <div style="overflow:auto">
+      <table id="rankTbl"><thead><tr><th>順位</th><th>チーム</th><th>合計</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+  <div class="tabs" id="teamTabs"></div>
+  <div class="grid" id="cards"></div>
+  <div class="foot">データ元：チーム編成 CSV / スコア入力 CSV（夜間自動リロード: 23:50 / 10分ごと）</div>
+</div>
+
+<script>
+const TEAM_CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRBooKDm5BOsRo-C0cGo7A4eYSqyE0M10COhOq1JxLSWe6Gh56yuv6nH2nB4meHjA/pub?gid=13413896&single=true&output=csv";const SCORE_CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRBooKDm5BOsRo-C0cGo7A4eYSqyE0M10COhOq1JxLSWe6Gh56yuv6nH2nB4meHjA/pub?gid=671232666&single=true&output=csv";
+const TEAM_COLORS={"大輔チーム":"#2a7cff","しげチーム":"#36b24a","まぎチーム":"#e0b300","もりチーム":"#ff8a3d","マサキングチーム":"#ff5db1","野島ケータチーム":"#9b7cff"};
+const fmt=n=>(n>0?'+':'')+(Math.round(n*10)/10).toFixed(1);const cls=n=>n>=0?'pos':'neg';
+function parseCSV(t){const r=[];const L=t.replace(/\r/g,'').split('\n').filter(x=>x.trim().length);for(let l of L){const o=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(ch=='"'){if(q&&l[i+1]=='"'){c+='"';i++;}else q=!q;}else if(ch===','&&!q){o.push(c);c='';}else c+=ch;}o.push(c);r.push(o);}return r;}
+async function fetchCSV(u){const res=await fetch(u,{cache:'no-store'});if(!res.ok)throw new Error('CSV fetch failed');return parseCSV(await res.text());}
+function headerIndexMap(h){const i={};h.forEach((v,k)=>{const s=(v||'').replace(/\s/g,'');if(!s)return;if(/^(チーム名)$/i.test(s))i.team=k;if(/^(監督|監督（友人名）)$/i.test(s))i.mgr=k;if(/^選手[①1]$/i.test(s))i.p1=k;if(/^スコア[①1]$/i.test(s))i.s1=k;if(/^選手[②2]$/i.test(s))i.p2=k;if(/^スコア[②2]$/i.test(s))i.s2=k;if(/^選手[③3]$/i.test(s))i.p3=k;if(/^スコア[③3]$/i.test(s))i.s3=k;if(/^選手[④4]$/i.test(s))i.p4=k;if(/^スコア[④4]$/i.test(s))i.s4=k;if(/^(合計|合計点)$/i.test(s))i.total=k;});return i;}
+function groupScoreByPlayer(scoreRows){const m=new Map();const H=scoreRows[0]||[];const col={name:-1,pt:-1};H.forEach((v,k)=>{const s=(v||'').replace(/\s/g,'');if(/^(選手名)$/i.test(s))col.name=k;if(/^(得点)$/i.test(s))col.pt=k;});scoreRows.slice(1).forEach(r=>{const name=r[col.name];const pt=parseFloat((r[col.pt]||'').replace(/[^\d.+-]/g,''));if(!name||isNaN(pt))return;m.set(name,(m.get(name)||0)+pt);});return m;}
+function buildTeams(teamRows,scoreMap){const hdr=teamRows[0]||[];const id=headerIndexMap(hdr);const rows=teamRows.slice(1).filter(r=>(r[id.team]||'').trim().length);return rows.map(r=>{function val(k){return typeof k==='number'?r[k]:''}function num(k){const n=parseFloat((val(k)||'').replace(/[^\d.+-]/g,''));return isNaN(n)?0:n}const players=[];const p=[id.p1,id.p2,id.p3,id.p4];const s=[id.s1,id.s2,id.s3,id.s4];for(let k=0;k<4;k++){const name=val(p[k]);if(!name)continue;let sc=num(s[k]);if((!sc||isNaN(sc))&&scoreMap&&scoreMap.has(name))sc=scoreMap.get(name);players.push({name,score:sc||0});}let total=num(id.total);if(!total)total=players.reduce((a,b)=>a+b.score,0);return {name:val(id.team),manager:val(id.mgr),players,total};});}
+function renderRank(ts){const tb=document.querySelector('#rankTbl tbody');tb.innerHTML='';[...ts].sort((a,b)=>b.total-a.total).forEach((t,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td><span class="teamchip">${t.name}</span></td><td class="score ${cls(t.total)}">${fmt(t.total)}</td>`;tb.appendChild(tr);});}
+function renderTabs(ts){const tabs=document.getElementById('teamTabs');tabs.innerHTML='';const all=document.createElement('button');all.className='tab active';all.textContent='全チーム';all.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));all.classList.add('active');renderCards(ts);};tabs.appendChild(all);ts.forEach(t=>{const b=document.createElement('button');b.className='tab';b.textContent=t.name;b.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));b.classList.add('active');renderCards([t]);};tabs.appendChild(b);});}
+function renderCards(ts){const w=document.getElementById('cards');w.innerHTML='';ts.forEach(t=>{const card=document.createElement('div');card.className='card';card.innerHTML=`<h3>■ <span>${t.name}</span> <span class="pill">監督: ${t.manager||''}</span></h3>`+t.players.map(p=>`<div class="row"><div>${p.name}</div><div class="score ${cls(p.score)}">${fmt(p.score)}</div></div>`).join('')+`<div class="row"><div><strong>合計</strong></div><div class="score ${cls(t.total)}"><strong>${fmt(t.total)}</strong></div></div>`;w.appendChild(card);});}
+async function bootstrap(){try{const [teamRows,scoreRows]=await Promise.all([fetchCSV(TEAM_CSV_URL),fetchCSV(SCORE_CSV_URL).catch(()=>[[]])]);const scoreMap=(scoreRows&&scoreRows.length>1)?groupScoreByPlayer(scoreRows):null;const teams=buildTeams(teamRows,scoreMap);renderRank(teams);renderTabs(teams);renderCards(teams);document.getElementById('updatedAt').textContent=new Date().toLocaleString();}catch(e){console.error(e);document.getElementById('updatedAt').textContent='読み込み失敗';}}
+document.getElementById('reloadBtn').addEventListener('click',bootstrap);bootstrap();
+setInterval(bootstrap,10*60*1000);
+setInterval(()=>{const d=new Date();if(d.getHours()===23&&d.getMinutes()===50) location.reload();},30*1000);
+</script>
+</body>
+</html>
