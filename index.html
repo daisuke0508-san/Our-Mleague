@@ -57,10 +57,10 @@ const TEAM_COLORS={
 const fmt = n => (n>0?'+':'')+(Math.round(n*10)/10).toFixed(1);
 const cls = n => n>=0 ? 'pos' : 'neg';
 
-/* ====== 追加：キャッシュバスター ====== */
+/* キャッシュバスター */
 const withBust = u => u + (u.includes('?') ? '&' : '?') + 'v=' + Date.now();
 
-/* CSV パース＆取得 */
+/* CSV パース */
 function parseCSV(t){
   const r=[]; const L=t.replace(/\r/g,'').split('\n').filter(x=>x.trim().length);
   for(let l of L){
@@ -81,47 +81,40 @@ async function fetchCSV(u){
   return parseCSV(await res.text());
 }
 
-/* ヘッダー→列インデックス */
+/* ヘッダー解析 */
 function headerIndexMap(h){
   const i={};
   h.forEach((v,k)=>{
     const s=(v||'').replace(/\s/g,'');
-    if(!s)return;
     if(/^(チーム名)$/i.test(s)) i.team=k;
     if(/^(監督|監督（友人名）)$/i.test(s)) i.mgr=k;
     if(/^選手[①1]$/i.test(s)) i.p1=k;
-    if(/^スコア[①1]$/i.test(s)) i.s1=k;
     if(/^選手[②2]$/i.test(s)) i.p2=k;
-    if(/^スコア[②2]$/i.test(s)) i.s2=k;
     if(/^選手[③3]$/i.test(s)) i.p3=k;
-    if(/^スコア[③3]$/i.test(s)) i.s3=k;
     if(/^選手[④4]$/i.test(s)) i.p4=k;
-    if(/^スコア[④4]$/i.test(s)) i.s4=k;
-    if(/^(合計|合計点)$/i.test(s)) i.total=k;
   });
   return i;
 }
 
-/* スコア入力CSV → 選手別合計マップ */
+/* スコア入力CSV → 選手別合計 */
 function groupScoreByPlayer(scoreRows){
   const m=new Map();
   const H=scoreRows[0]||[];
-  const col={name:-1,pt:-1};
+  let colName=-1, colPt=-1;
   H.forEach((v,k)=>{
     const s=(v||'').replace(/\s/g,'');
-    if(/^(選手名)$/i.test(s)) col.name=k;
-    if(/^(得点)$/i.test(s))   col.pt=k;
+    if(/^(選手名)$/i.test(s)) colName=k;
+    if(/^(得点)$/i.test(s))   colPt=k;
   });
   scoreRows.slice(1).forEach(r=>{
-    const name=r[col.name];
-    const pt=parseFloat((r[col.pt]||'').replace(/[^\d.+\-]/g,''));
+    const name=r[colName];
+    const pt=parseFloat((r[colPt]||'').replace(/[^\d.+\-]/g,''));
     if(!name||isNaN(pt))return;
     m.set(name,(m.get(name)||0)+pt);
   });
   return m;
 }
 
-/* チーム構築 */
 /* チーム構築（スコア入力優先版） */
 function buildTeams(teamRows,scoreMap){
   const hdr=teamRows[0]||[];
@@ -132,7 +125,6 @@ function buildTeams(teamRows,scoreMap){
     const players=[];
     const p=[id.p1,id.p2,id.p3,id.p4];
 
-    // 各選手の点数は「スコア入力」由来（scoreMap）のみを使う
     for(let k=0;k<4;k++){
       const name=val(p[k]);
       if(!name) continue;
@@ -140,12 +132,10 @@ function buildTeams(teamRows,scoreMap){
       players.push({name,score:sc});
     }
 
-    // 合計も必ず players の合計から計算（手入力列は見ない）
     const total=players.reduce((a,b)=>a+b.score,0);
     return {name:val(id.team),manager:val(id.mgr),players,total};
   });
 }
-
 
 /* 描画 */
 function renderRank(ts){
@@ -205,4 +195,3 @@ setInterval(()=>{const d=new Date();if(d.getHours()===23&&d.getMinutes()===50) l
 </script>
 </body>
 </html>
-
