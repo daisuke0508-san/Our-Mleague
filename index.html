@@ -107,7 +107,9 @@ function groupScoreByPlayer(scoreRows){
   let colName=-1, colPt=-1;
   H.forEach((v,k)=>{
     const s=(v||'').replace(/\s/g,'');
-    if(/^(選手名)$/i.test(s)) colName=k;
+-  if(/^(選手名)$/i.test(s)) col.name=k;
++  if(/^(選手名|選手)$/i.test(s)) col.name=k;
+
     if(/^(得点)$/i.test(s))   colPt=k;
   });
   scoreRows.slice(1).forEach(r=>{
