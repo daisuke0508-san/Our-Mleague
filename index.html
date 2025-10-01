@@ -100,18 +100,20 @@ function headerIndexMap(h){
   return i;
 }
 
-/* スコア入力CSV → 選手別合計 */
+// スコア入力CSV → 選手別合計マップ
 function groupScoreByPlayer(scoreRows){
   const m=new Map();
   const H=scoreRows[0]||[];
-  let colName=-1, colPt=-1;
+  const col={name:-1,pt:-1};
   H.forEach((v,k)=>{
     const s=(v||'').replace(/\s/g,'');
--  if(/^(選手名)$/i.test(s)) col.name=k;
-+  if(/^(選手名|選手)$/i.test(s)) col.name=k;
-
-    if(/^(得点)$/i.test(s))   colPt=k;
+-   if(/^(選手名)$/i.test(s)) col.name=k;
++   if(/^(選手名|選手)$/i.test(s)) col.name=k;   // ←「選手」にも対応
+    if(/^(得点)$/i.test(s))   col.pt=k;
   });
+  …
+}
+
   scoreRows.slice(1).forEach(r=>{
     const name=r[colName];
     const pt=parseFloat((r[colPt]||'').replace(/[^\d.+\-]/g,''));
