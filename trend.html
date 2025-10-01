@@ -1,225 +1,256 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>勝手にMリーグ｜節ごとのポイント推移</title>
-<link rel="preconnect" href="https://cdn.jsdelivr.net">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-<style>
-  :root{--bg:#0f0f12;--panel:#17171b;--ink:#f6f7fb;--muted:#9aa0a6;--card:#1b1c20;--border:#2a2f37;--accent:#3ea6ff}
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Noto Sans JP","Hiragino Sans",Roboto,Arial}
-  header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);background:#121419}
-  h1{font-size:16px;margin:0} .sub{color:var(--muted);font-size:12px}
-  .wrap{max-width:1080px;margin:0 auto;padding:12px}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  select,button{background:#11151b;border:1px solid var(--border);color:var(--ink);border-radius:8px;padding:8px 10px}
-  .pill{border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:999px;font-size:12px}
-  .btn{cursor:pointer} .muted{color:var(--muted)}
-  canvas{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:6px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>勝手にMリーグ｜節ごとのポイント推移</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{--bg:#0f0f12;--panel:#17171b;--ink:#fafafa;--muted:#a8a8b3;--green:#1fbf64;--red:#ff5c5c;--card:#1c1c21;--border:#2a2a31}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Noto Sans JP","Hiragino Sans",Roboto,Arial}
+    header{position:sticky;top:0;background:#121216;padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;z-index:1}
+    h1{font-size:16px;margin:0}.sub{font-size:12px;color:var(--muted)}
+    .wrap{padding:12px;max-width:980px;margin:0 auto}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    select,button{background:#141418;border:1px solid var(--border);color:var(--ink);border-radius:8px;padding:8px 10px}
+    .btn{cursor:pointer}
+    .muted{color:var(--muted);font-size:12px}
+    .chip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:4px 10px;margin:2px 6px 0 0;font-size:12px}
+    .toolbar{display:flex;gap:8px;align-items:center;margin:10px 0}
+    a.btnlink{padding:8px 10px;border:1px solid var(--border);border-radius:8px;color:var(--ink);text-decoration:none}
+    canvas{background:#111}
+  </style>
 </head>
 <body>
 <header>
   <div>
     <h1>勝手にMリーグ｜節ごとのポイント推移</h1>
-    <div class="sub">「第1→第3試合」を1セット=1節として集計（累計/節別 切り替え可）</div>
+    <div class="sub">「第1〜第3試合」を1セット=1節として集計（累計/節別 切り替え可）</div>
   </div>
-  <a href="./" class="pill" style="text-decoration:none">ダッシュボードへ</a>
+  <div style="margin-left:auto;display:flex;gap:8px;">
+    <a href="index.html" class="btnlink">ダッシュボードへ</a>
+  </div>
 </header>
 
 <div class="wrap">
-  <div class="panel" style="margin-bottom:12px">
-    <div class="row" style="margin-bottom:8px">
-      <label>表示チーム：</label>
-      <select id="teamSelect" multiple size="4" style="min-width:220px"></select>
+  <div class="panel">
+    <div class="toolbar">
       <label>表示モード：</label>
       <select id="mode">
-        <option value="cum">累計（節ごとに積み上げ）</option>
-        <option value="per">節別（その節の増減のみ）</option>
+        <option value="cumulative">累計（節ごとに積み上げ）</option>
+        <option value="perSet">節別（その節の合計）</option>
       </select>
+
+      <label style="margin-left:8px;">表示チーム：</label>
+      <select id="teams" multiple size="1" style="min-width:180px;"></select>
+
       <button id="reload" class="btn">更新</button>
       <span id="updated" class="muted"></span>
     </div>
+    <div id="legend" class="muted" style="margin-bottom:6px;"></div>
+    <canvas id="chart" height="420"></canvas>
   </div>
-
-  <canvas id="chart" height="420"></canvas>
 </div>
 
 <script>
-/* ===== あなたのCSV公開URLに差し替え（/pub?...&output=csv 形式） ===== */
-// ★ここをあなたの公開CSVに置き換える
-const TEAM_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=13413896&single=true&output=csv';
-const SCORE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=671232666&single=true&output=csv';
+/* ===== あなたのCSV公開URL（pub?...&output=csv 形式） ===== */
+const TEAM_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=13413896&single=true&output=csv';
+const SCORE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=671232666&single=true&output=csv';
 
+/* チーム色（index.html と合わせる） */
+const TEAM_COLORS={
+  "大輔チーム":"#2a7cff","しげチーム":"#36b24a","まぎチーム":"#e0b300",
+  "もりチーム":"#ff8a3d","マサキングチーム":"#ff5db1","ケータチーム":"#ff0000",
+  "やや下チーム":"#b4b7bc","やや上チーム":"#a0a4ff","最下位チーム":"#ff6b6b","新人チーム":"#7dd3fc"
+};
 
-/* ===== 以降はそのまま ===== */
-
-// ざっくり色（必要なら後で増やしてOK）
-const COLORS = ['#2a7cff','#36b24a','#e0b300','#ff8a3d','#ff5db1','#9b7cff','#19c8c4','#f45d48','#c0ca33','#ab47bc'];
-
+/* 小物 */
 const withBust = u => u + (u.includes('?')?'&':'?') + 'v=' + Date.now();
 
+/* CSVパーサ（ダブルクォート対応） */
+function parseCSV(text){
+  const out=[], lines=text.replace(/\r/g,'').split('\n').filter(s=>s.trim().length);
+  for(const line of lines){
+    const row=[]; let cur='', q=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch=='"'){ if(q && line[i+1]=='"'){cur+='"'; i++;} else {q=!q;} }
+      else if(ch==',' && !q){ row.push(cur); cur=''; }
+      else { cur+=ch; }
+    }
+    row.push(cur); out.push(row);
+  }
+  return out;
+}
 async function fetchCSV(url){
   const res = await fetch(withBust(url), {cache:'no-store'});
   if(!res.ok) throw new Error('CSV fetch failed: '+url);
-  const text = await res.text();
-  return parseCSV(text);
+  return parseCSV(await res.text());
 }
 
-function parseCSV(t){
-  const rows=[]; const L=t.replace(/\r/g,'').split('\n').filter(x=>x.trim().length);
-  for(const line of L){
-    const out=[]; let cur='', q=false;
-    for(let i=0;i<line.length;i++){
-      const ch=line[i];
-      if(ch=='"'){ if(q && line[i+1]=='"'){ cur+='"'; i++; } else q=!q; }
-      else if(ch==',' && !q){ out.push(cur); cur=''; }
-      else { cur+=ch; }
-    }
-    out.push(cur); rows.push(out);
-  }
-  return rows;
-}
-
-function headerIndexMapTeam(hdr){
-  const m={};
-  hdr.forEach((v,i)=>{
+/* ===== チーム編成ヘッダ位置 ===== */
+function teamHeaderIndex(h){
+  const idx={};
+  h.forEach((v,i)=>{
     const s=String(v||'').replace(/\s/g,'');
-    if(/^チーム名$/i.test(s)) m.team=i;
-    if(/^監督|監督（友人名）$/i.test(s)) m.mgr=i;
-    if(/^選手[①1]$/i.test(s)) m.p1=i;
-    if(/^選手[②2]$/i.test(s)) m.p2=i;
-    if(/^選手[③3]$/i.test(s)) m.p3=i;
-    if(/^選手[④4]$/i.test(s)) m.p4=i;
+    if(/^チーム名$/i.test(s)) idx.team=i;
+    if(/^(監督|監督（友人名）)$/i.test(s)) idx.mgr=i;
+    if(/^選手[①1]$/i.test(s)) idx.p1=i;
+    if(/^選手[②2]$/i.test(s)) idx.p2=i;
+    if(/^選手[③3]$/i.test(s)) idx.p3=i;
+    if(/^選手[④4]$/i.test(s)) idx.p4=i;
   });
-  return m;
+  return idx;
 }
 
-function headerIndexMapScore(hdr){
-  const m={};
-  hdr.forEach((v,i)=>{
+/* ===== スコア入力ヘッダ位置（表記ゆれ対応） ===== */
+function scoreHeaderIndex(h){
+  let date=-1, game=-1, name=-1, pt=-1, team=-1;
+  h.forEach((v,i)=>{
     const s=String(v||'').replace(/\s/g,'');
-    if(/^日付$/i.test(s))       m.date=i;
-    if(/^試合番号$/i.test(s))   m.game=i;
-    if(/^選手名|選手$/i.test(s))     m.name=i;
-    if(/^得点$/i.test(s))       m.pt=i;
+    if(/^(日付|date)$/i.test(s)) date=i;
+    if(/^(試合|#試合|回戦|game|round)$/i.test(s)) game=i;
+    if(/^(選手名|選手|name|player)$/i.test(s)) name=i;
+    if(/^(得点|pt|ポイント|score)$/i.test(s)) pt=i;
+    if(/^(所属チーム|チーム)$/i.test(s)) team=i; // 任意
   });
-  return m;
+  return {date,game,name,pt,team};
 }
 
-function normalizeName(s){
-  return String(s||'').replace(/\s+/g,'').replace(/[★☆◎○▲△▼▽・（）()［］\[\]／\/]/g,'').trim();
-}
+/* ===== データ読込・整形 ===== */
+async function loadAll(){
+  const [teamRows, scoreRows] = await Promise.all([
+    fetchCSV(TEAM_CSV_URL),
+    fetchCSV(SCORE_CSV_URL)
+  ]);
 
-function toNum(x){
-  const n=parseFloat(String(x||'').replace(/[^\d.\-]/g,''));
-  return isFinite(n)?n:0;
-}
-
-async function loadData(){
-  const [teamRows, scoreRows] = await Promise.all([fetchCSV(TEAM_CSV_URL), fetchCSV(SCORE_CSV_URL)]);
-  // --- roster: player -> team ---
-  const th=headerIndexMapTeam(teamRows[0]||[]), roster=new Map(), teams=[];
+  // 選手→チーム の対応を作る
+  const th = teamHeaderIndex(teamRows[0]||[]);
+  const pCols = [th.p1, th.p2, th.p3, th.p4].filter(n=>typeof n==='number');
+  const playerToTeam = new Map();
+  const teams = [];
   teamRows.slice(1).forEach(r=>{
-    const name=r[th.team]; if(!name) return;
-    teams.push(name);
-    [th.p1,th.p2,th.p3,th.p4].forEach(c=>{
-      const p=r[c]; if(p) roster.set(normalizeName(p), name);
+    const teamName = r[th.team];
+    if(!teamName) return;
+    teams.push(teamName);
+    pCols.forEach(ci=>{
+      const nm = (r[ci]||'').trim();
+      if(nm) playerToTeam.set(nm, teamName);
     });
   });
 
-  // --- score grouped by date+set ---
-  const sh=headerIndexMapScore(scoreRows[0]||[]);
-  const sets=[]; // label list
-  const idxMap=new Map(); // label -> index
-  const agg={}; // team -> [perSet...]
+  // スコアを「節」単位に集計（節 = ceil(試合番号/3)）
+  const sh = scoreHeaderIndex(scoreRows[0]||[]);
+  if (sh.game < 0 || sh.name < 0 || sh.pt < 0) {
+    throw new Error('ヘッダー判定に失敗（試合/選手名/得点）');
+  }
 
+  let maxSet = 0;
+  const perSetByTeam = new Map(); // team -> Map(set -> sum)
   scoreRows.slice(1).forEach(r=>{
-    const date=r[sh.date];
-    const game = Math.max(1, parseInt(String(r[sh.game]||'').replace(/[^\d]/g,''))||1);
-    const setNo = Math.ceil(game/3);
-    const label = `${date} 第${setNo}節`;
-    if(!idxMap.has(label)){ idxMap.set(label, sets.length); sets.push(label); }
-    const player = normalizeName(r[sh.name]);
-    const team = roster.get(player);
-    if(!team) return; // ロスター外は無視
-    const pt = toNum(r[sh.pt]);
+    let game = Number(String(r[sh.game]||'').replace(/[^\d]/g,''));
+    if(!Number.isFinite(game) || game<=0) game = 1;
+    const set = Math.ceil(game/3);
+    maxSet = Math.max(maxSet, set);
 
-    if(!agg[team]) agg[team]=new Array(sets.length).fill(0);
-    // 足りない分を0で埋める
-    while(agg[team].length < sets.length) agg[team].push(0);
-    const i = idxMap.get(label);
-    agg[team][i] += pt;
+    const name = String(r[sh.name]||'').trim();
+    const pt   = Number(String(r[sh.pt]||'').replace(/[^\-\d.]/g,''));
+    if(!name || !Number.isFinite(pt)) return;
+
+    const team = playerToTeam.get(name) || (sh.team>=0 ? String(r[sh.team]||'').trim() : '');
+    if(!team) return; // 編成外は除外
+
+    if(!perSetByTeam.has(team)) perSetByTeam.set(team, new Map());
+    const m = perSetByTeam.get(team);
+    m.set(set, (m.get(set)||0) + pt);
   });
 
-  return {teams, sets, agg};
+  return {teams, perSetByTeam, maxSet};
 }
 
-function toCumulative(arr){
-  let s=0; return arr.map(v=> (s+=v));
-}
-
+/* ===== Chart.js 描画 ===== */
 let chart;
-function render({teams,sets,agg}, selTeams, mode='cum'){
-  const ctx=document.getElementById('chart').getContext('2d');
-  if(chart){ chart.destroy(); }
+function renderChart({teams, perSetByTeam, maxSet}, mode, pickedTeams){
+  const labels = Array.from({length:maxSet}, (_,i)=> (i+1)+'節');
 
-  const datasets = selTeams.map((t,idx)=>{
-    const per = (agg[t]||new Array(sets.length).fill(0)).slice(0, sets.length);
-    const data = (mode==='cum') ? toCumulative(per) : per;
+  const selected = pickedTeams.length ? pickedTeams : teams;
+
+  const datasets = selected.map((t,i)=>{
+    const sums = [];
+    for(let s=1;s<=maxSet;s++){
+      sums.push( (perSetByTeam.get(t)?.get(s)) || 0 );
+    }
+    const data = (mode==='cumulative')
+      ? sums.reduce((a,v)=>{ a.push((a.at(-1)||0)+v); return a; }, [])
+      : sums;
+
+    const color = TEAM_COLORS[t] || `hsl(${(i*50)%360} 80% 60%)`;
     return {
       label: t,
       data,
-      borderColor: COLORS[idx%COLORS.length],
-      backgroundColor: COLORS[idx%COLORS.length],
-      tension: 0.2,
-      pointRadius: 3
+      borderColor: color,
+      backgroundColor: color,
+      tension: 0.25,
+      spanGaps: true
     };
   });
 
+  const ctx = document.getElementById('chart').getContext('2d');
+  if(chart) chart.destroy();
   chart = new Chart(ctx, {
     type: 'line',
-    data: { labels: sets, datasets },
+    data: { labels, datasets },
     options: {
       responsive: true,
-      interaction: { mode:'nearest', intersect:false },
-      plugins: { legend:{ position:'bottom' } },
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#ddd' } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.formattedValue}` } }
+      },
       scales: {
-        x: { ticks:{ color:'#cfd2d6' }, grid:{ color:'rgba(255,255,255,0.06)'} },
-        y: { ticks:{ color:'#cfd2d6' }, grid:{ color:'rgba(255,255,255,0.06)'} }
+        x: { ticks: { color: '#bbb' }, grid: { color: '#222'} },
+        y: { ticks: { color: '#bbb' }, grid: { color: '#222'} }
       }
     }
   });
+
+  // 集計凡例
+  const lg = selected.map(t=>`<span class="chip" style="border-color:${TEAM_COLORS[t]||'#444'}">${t}</span>`).join('');
+  document.getElementById('legend').innerHTML = lg;
 }
 
+/* ===== 起動・UI ===== */
+let latest;
 async function bootstrap(){
   try{
-    const data = await loadData();
-    // チーム選択肢
-    const sel = document.getElementById('teamSelect');
-    sel.innerHTML='';
-    data.teams.forEach((t,i)=>{
-      const opt=document.createElement('option'); opt.value=t; opt.textContent=t;
-      if(i<4) opt.selected = true; // 初期で上から少し選択
+    latest = await loadAll();
+
+    // チーム選択の初期化
+    const sel = document.getElementById('teams');
+    sel.innerHTML = '';
+    latest.teams.forEach(t=>{
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = t;
       sel.appendChild(opt);
     });
-    render(data, getSelectedTeams(), document.getElementById('mode').value);
-    document.getElementById('reload').onclick = ()=>{
-      render(data, getSelectedTeams(), document.getElementById('mode').value);
-      document.getElementById('updated').textContent = '更新: ' + new Date().toLocaleString();
-    };
-    document.getElementById('updated').textContent = '更新: ' + new Date().toLocaleString();
+
+    // 初回描画（累計・全チーム）
+    renderChart(latest, document.getElementById('mode').value, []);
+    document.getElementById('updated').textContent = new Date().toLocaleString();
   }catch(e){
-    console.error(e);
     alert('読み込みに失敗しました。CSV公開URLとヘッダー名を確認してください。');
+    console.error(e);
   }
 }
 
-function getSelectedTeams(){
-  return Array.from(document.getElementById('teamSelect').selectedOptions).map(o=>o.value);
-}
+document.getElementById('reload').addEventListener('click', ()=>{
+  const mode = document.getElementById('mode').value;
+  const picked = Array.from(document.getElementById('teams').selectedOptions).map(o=>o.value);
+  renderChart(latest, mode, picked);
+  document.getElementById('updated').textContent = new Date().toLocaleString();
+});
 
 bootstrap();
 </script>
