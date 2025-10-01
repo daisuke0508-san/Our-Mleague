@@ -108,11 +108,13 @@ function groupScoreByPlayer(scoreRows){
   H.forEach((v,k)=>{
     const s=(v||'').replace(/\s/g,'');
 -   if(/^(選手名)$/i.test(s)) col.name=k;
-+   if(/^(選手名|選手)$/i.test(s)) col.name=k;   // ←「選手」にも対応
-    if(/^(得点)$/i.test(s))   col.pt=k;
+-   if(/^(得点)$/i.test(s))   col.pt=k;
++   if(/^(選手名|選手)$/i.test(s)) col.name=k;            // ← どちらもOK
++   if(/^(得点|pt|ポイント|score)$/i.test(s)) col.pt=k;    // ← 表記ゆれ対応
   });
   …
 }
+
 
   scoreRows.slice(1).forEach(r=>{
     const name=r[colName];
