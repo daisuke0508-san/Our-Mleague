@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>勝手にMリーグ｜節ごとのポイント推移</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0f0f12;--panel:#17171b;--ink:#fafafa;--muted:#a8a8b3;--border:#2a2a31;--green:#1fbf64;--red:#ff5c5c}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Noto Sans JP","Hiragino Sans",Roboto,Arial}
+  header{position:sticky;top:0;background:#121216;padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;z-index:1}
+  h1{font-size:16px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .wrap{max-width:1100px;margin:0 auto;padding:12px}
+  .panel{background:#17171b;border:1px solid var(--border);border-radius:12px;padding:12px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  select,button{background:#111;border:1px solid var(--border);color:var(--ink);border-radius:8px;padding:8px 10px}
+  .btn{padding:8px 10px;border:1px solid var(--border);background:transparent;color:var(--ink);border-radius:8px;text-decoration:none}
+  .muted{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>勝手にMリーグ｜節ごとのポイント推移</h1>
+    <div class="sub">「第1→第3試合」を1セット＝1節として合算／累計も切替可</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;">
+    <a href="index.html" class="btn">ダッシュボードへ</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="row">
+      <label>表示チーム：</label>
+      <select id="teamSelect" multiple size="6" style="min-width:220px"></select>
+      <label>表示モード：</label>
+      <select id="mode">
+        <option value="cumu" selected>累計（節ごとに積み上げ）</option>
+        <option value="each">各節の合計（その節だけ）</option>
+      </select>
+      <button id="apply">更新</button>
+      <span class="muted" id="updatedAt"></span>
+    </div>
+    <canvas id="chart" height="120"></canvas>
+  </div>
+</div>
+
+<script>
+/*** 1) あなたのCSV公開URLに置き換え ***/
+const TEAM_CSV_URL  = '<<ここに チーム編成 CSV の公開URL>>';
+const SCORE_CSV_URL = '<<ここに スコア入力 CSV の公開URL>>';
+
+/*** 2) チーム色（必要なら追記） ***/
+const TEAM_COLORS={
+  "大輔チーム":"#2a7cff","しげチーム":"#36b24a","まぎチーム":"#e0b300",
+  "もりチーム":"#ff8a3d","マサキングチーム":"#ff5db1","野島ケータチーム":"#9b7cff",
+  "ケータチーム":"#ff4d4d","最下位チーム":"#888","やや下チーム":"#7c9","やや上チーム":"#9cf","新人チーム":"#c9f"
+};
+
+const withBust = u => u + (u.includes('?')?'&':'?') + 'v=' + Date.now();
+
+function parseCSV(t){
+  const rows=[], L=t.replace(/\r/g,'').split('\n');
+  for(const line of L){
+    if(!line.trim()) continue;
+    const cols=[]; let cell='',q=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch=='"'){ if(q && line[i+1]=='"'){cell+='"'; i++;} else q=!q; }
+      else if(ch===',' && !q){ cols.push(cell); cell=''; }
+      else cell+=ch;
+    }
+    cols.push(cell); rows.push(cols);
+  }
+  return rows;
+}
+async function fetchCSV(url){ const res=await fetch(withBust(url),{cache:'no-store'}); return parseCSV(await res.text()); }
+const headerIdx = (h) => {
+  const m={};
+  h.forEach((v,i)=>{
+    const s=String(v||'').replace(/\s/g,'');
+    if(/^(チーム名)$/i.test(s)) m.team=i;
+    if(/^(監督|監督（友人名）)$/i.test(s)) m.mgr=i;
+    if(/^選手[①1]$/i.test(s)) m.p1=i;
+    if(/^選手[②2]$/i.test(s)) m.p2=i;
+    if(/^選手[③3]$/i.test(s)) m.p3=i;
+    if(/^選手[④4]$/i.test(s)) m.p4=i;
+  });
+  return m;
+};
+
+/*** 3) 選手→チーム対応表 ***/
+function buildPlayerToTeamMap(teamRows){
+  const H=teamRows[0]||[]; const idx=headerIdx(H); const map=new Map();
+  teamRows.slice(1).forEach(r=>{
+    const team=r[idx.team]; if(!team) return;
+    [idx.p1,idx.p2,idx.p3,idx.p4].forEach(k=>{
+      const name = (typeof k==='number') ? r[k] : '';
+      if(name) map.set(name, team);
+    });
+  });
+  return map;
+}
+
+/*** 4) 「第1→第3試合」を1セット＝1節にまとめる集計 ***/
+function aggregateBySetTeam(scoreRows, playerToTeam){
+  const H = scoreRows[0]||[];
+  let cNo=-1,cName=-1,cPt=-1;
+  H.forEach((v,k)=>{
+    const s=String(v||'').replace(/\s/g,'');
+    if(/^(試合番号)$/i.test(s)) cNo=k;
+    if(/^(選手名)$/i.test(s))  cName=k;
+    if(/^(得点)$/i.test(s))    cPt=k;
+  });
+
+  const bySetTeam=new Map(); const order=[];
+  let setIdx=0, prevNo=0;
+
+  scoreRows.slice(1).forEach(r=>{
+    const name=r[cName]; if(!name) return;
+    const team=playerToTeam.get(name); if(!team) return;
+
+    const m = String(r[cNo]||'').match(/\d+/);
+    if(!m) return;
+    const no = parseInt(m[0],10);
+    const pt = parseFloat(String(r[cPt]||'').replace(/[^\d.+-]/g,''));
+    if(isNaN(pt)) return;
+
+    if(no===1 && prevNo!==1){ setIdx+=1; order.push(setIdx); if(!bySetTeam.has(setIdx)) bySetTeam.set(setIdx,new Map()); }
+    else if(setIdx===0){ return; }
+
+    const bucket = bySetTeam.get(setIdx);
+    bucket.set(team, (bucket.get(team)||0)+pt);
+    prevNo=no;
+  });
+  return {sets:order, bySetTeam};
+}
+
+/*** 5) グラフ描画 ***/
+let chart;
+function autoColor(i){ const hue=(i*63)%360; return `hsl(${hue} 90% 60%)`; }
+function renderChart(labels,datasets){
+  const ctx=document.getElementById('chart');
+  if(chart) chart.destroy();
+  chart=new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets},
+    options:{
+      responsive:true,
+      scales:{
+        x:{ticks:{color:'#ddd'}},
+        y:{ticks:{color:'#ddd'}, grid:{color:'#333'}}
+      },
+      plugins:{
+        legend:{labels:{color:'#ddd'}},
+        tooltip:{mode:'index',intersect:false}
+      }
+    }
+  });
+}
+
+/*** 6) 起動 ***/
+async function main(){
+  const [teamRows,scoreRows]=await Promise.all([fetchCSV(TEAM_CSV_URL), fetchCSV(SCORE_CSV_URL)]);
+  const p2t = buildPlayerToTeamMap(teamRows);
+  const {sets, bySetTeam} = aggregateBySetTeam(scoreRows, p2t);
+
+  // チーム一覧（編成CSVの順番）
+  const teams = teamRows.slice(1).map(r=>r[ headerIdx(teamRows[0]).team ]).filter(Boolean);
+
+  // UI
+  const sel=document.getElementById('teamSelect');
+  teams.forEach(t=>{
+    const o=document.createElement('option'); o.value=t; o.textContent=t; o.selected=true; sel.appendChild(o);
+  });
+  const modeSel=document.getElementById('mode');
+
+  function buildSeries(mode){
+    const series={}; const running={};
+    teams.forEach(t=>{series[t]=[]; running[t]=0;});
+    sets.forEach(s=>{
+      const tm = bySetTeam.get(s) || new Map();
+      teams.forEach(t=>{
+        const daily = +(tm.get(t)||0);
+        running[t] = (mode==='cumu') ? (running[t] + daily) : daily;
+        series[t].push(running[t]);
+      });
+    });
+    return series;
+  }
+
+  function update(){
+    const chosen=[...sel.selectedOptions].map(o=>o.value);
+    const mode=modeSel.value;
+    const series=buildSeries(mode);
+    const datasets=chosen.map((t,i)=>({
+      label:t,
+      data:series[t],
+      borderColor:TEAM_COLORS[t]||autoColor(i),
+      backgroundColor:'transparent',
+      pointRadius:2,
+      tension:0.2
+    }));
+    const labels=sets.map(s=>`第${s}節`);
+    renderChart(labels,datasets);
+    document.getElementById('updatedAt').textContent='更新: '+new Date().toLocaleString();
+  }
+
+  document.getElementById('apply').addEventListener('click',update);
+  update();
+}
+
+main().catch(e=>{ console.error(e); alert('読み込み失敗: '+e.message); });
+</script>
+</body>
+</html>
