@@ -103,7 +103,7 @@ function headerIndexMapScore(hdr){
     const s=String(v||'').replace(/\s/g,'');
     if(/^日付$/i.test(s))       m.date=i;
     if(/^試合番号$/i.test(s))   m.game=i;
-    if(/^選手名$/i.test(s))     m.name=i;
+    if(/^選手名|選手$/i.test(s))     m.name=i;
     if(/^得点$/i.test(s))       m.pt=i;
   });
   return m;
