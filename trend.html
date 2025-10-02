@@ -67,6 +67,28 @@
 const TEAM_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=13413896&single=true&output=csv';
 const SCORE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=671232666&single=true&output=csv';
 
+/* ===== チーム色（index.html と共通） ===== */
+const TEAM_COLORS = {
+  "大輔チーム":       "#2a7cff",
+  "しげチーム":       "#36b24a",
+  "まぎチーム":       "#e0b300",
+  "もりチーム":       "#ff8a3d",
+  "マサキングチーム": "#ff5db1",
+  "ケータチーム":     "#ff0000",
+  "最下位チーム":     "#a0a0a8",
+  "やや下チーム":     "#7fb3ff",
+  "やや上チーム":     "#9b7cff",
+  "新人チーム":       "#7fd3ff"
+};
+
+/* 既存 COLORS はそのまま残してOK（未定義チームの保険） */
+const COLORS = ['#2a7cff','#36b24a','#e0b300','#ff8a3d','#ff5db1','#ff3b30',
+                '#a0a0a8','#9b7cff','#7fd3ff','#9ad67e','#ff8ecf','#ffd166'];
+
+/* 色の取り出し（まずチーム名→無ければ配列色） */
+const colorOf = (team, i) => TEAM_COLORS[team] ?? COLORS[i % COLORS.length];
+
+  
 /* ===== 表示色（必要に応じて増やせます） ===== */
 const COLORS = ['#2a7cff','#36b24a','#e0b300','#ff8a3d','#ff5db1','#ff3b30',
                 '#a0a0a8','#9b7cff','#7fd3ff','#9ad67e','#ff8ecf','#ffd166'];
@@ -178,8 +200,10 @@ function drawChart({teams, latestGame, series, mode}){
   const datasets = teams.map((t,i)=>({
     label: t,
     data: (series.get(t)||[]).map((y,x)=>({x:x+1,y})),
-    borderColor: COLORS[i % COLORS.length],
-    backgroundColor: COLORS[i % COLORS.length],
+-   borderColor: COLORS[i % COLORS.length],
+-   backgroundColor: COLORS[i % COLORS.length],
++   borderColor: colorOf(t,i),
++   backgroundColor: colorOf(t,i),
     tension: 0.25,
     pointRadius: 1.6,
     pointHitRadius: 8,
@@ -225,7 +249,9 @@ function drawChart({teams, latestGame, series, mode}){
   teams.forEach((t,i)=>{
     const chip = document.createElement('button');
     chip.className = 'chip';
-    chip.style.borderColor = COLORS[i % COLORS.length];
+    - chip.style.borderColor = COLORS[i % COLORS.length];
++ chip.style.borderColor = colorOf(t,i);
+
     chip.style.color = '#fff';
     chip.style.background = 'transparent';
     chip.textContent = t;
