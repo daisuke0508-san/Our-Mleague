@@ -54,11 +54,20 @@
 const TEAM_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=13413896&single=true&output=csv';
 const SCORE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=671232666&single=true&output=csv';
 
-/* チーム色 */
-const TEAM_COLORS={
-  "大輔チーム":"#2a7cff","しげチーム":"#36b24a","まぎチーム":"#e0b300",
-  "もりチーム":"#ff8a3d","マサキングチーム":"#ff5db1","ケータチーム":"#ff0000"
+/* チーム色（共通定義） */
+const TEAM_COLORS = {
+  "大輔チーム": "#2a7cff",    // 青
+  "しげチーム": "#36b24a",    // 緑
+  "まぎチーム": "#e0b300",    // 黄
+  "もりチーム": "#ff8a3d",    // オレンジ
+  "マサキングチーム": "#ff5db1", // ピンク
+  "ケータチーム": "#ff0000",   // 赤
+  "最下位チーム": "#555555",   // グレー
+  "やや下チーム": "#888888",   // 薄グレー
+  "やや上チーム": "#8a6de9",   // 紫
+  "新人チーム": "#00cfff"     // 水色
 };
+
 
 /* 表示ユーティリティ */
 const fmt = n => (n>0?'+':'')+(Math.round(n*10)/10).toFixed(1);
