@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>勝手にMリーグ｜節ではなく“試合ごと”のポイント推移</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>勝手にMリーグ｜試合ごとのポイント推移</title>
 
-<!-- Chart.js（公式CDN） -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <style>
@@ -21,7 +21,7 @@
   .btn{padding:8px 12px;border:1px solid var(--border);background:transparent;color:var(--ink);border-radius:8px}
   select{background:#0e0e12;color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:8px}
   .muted{color:var(--muted);font-size:12px}
-  #chartBox{position:relative;height:520px;}
+  #chartBox{position:relative;height:520px}
   .chip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:6px 10px;margin:4px 6px 0 0}
   .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   a.back{margin-left:auto}
@@ -30,10 +30,10 @@
 <body>
 
 <header>
-  <div class="wrap" style="display:flex;align-items:center;gap:10px;">
+  <div class="wrap" style="display:flex;align-items:center;gap:10px">
     <div>
       <h1>勝手にMリーグ｜試合ごとのポイント推移</h1>
-      <div class="sub">「第1試合→最新試合」をX軸にして表示（初期状態は全チーム／右端＝最新試合）</div>
+      <div class="sub">「第1試合→最新試合」をX軸（初期＝全チーム／右端＝最新試合）</div>
     </div>
     <a href="./" class="btn back">ダッシュボードへ</a>
   </div>
@@ -55,19 +55,21 @@
 
     <div class="bar" id="legendChips"></div>
 
-    <div id="chartBox" class="panel" style="margin-top:10px;">
+    <div id="chartBox" class="panel" style="margin-top:10px">
       <canvas id="chart"></canvas>
     </div>
-    <div class="muted" style="margin-top:8px">※ 凡例（上）をタップすると表示のON/OFFができます。</div>
+    <div class="muted" style="margin-top:8px">※ 凡例（上）をタップで線の表示ON/OFF</div>
   </div>
 </main>
 
 <script>
-/* ===== あなたのCSV公開URL（pub?...&output=csv） ===== */
-const TEAM_CSV_URL  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=13413896&single=true&output=csv';
-const SCORE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=671232666&single=true&output=csv';
+/* ===== あなたのCSV公開URL ===== */
+const TEAM_CSV_URL  =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=13413896&single=true&output=csv';
+const SCORE_CSV_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKiDBUEB6mAd_Jv4YGkDUiZF4PN65NeFnD2lm_sBhbkmWYTk1dvRT0NoAGGxsNTHueHmgQ8iM5up0R/pub?gid=671232666&single=true&output=csv';
 
-/* ===== チーム色（index.html と共通） ===== */
+/* ===== チーム色（index.html と同一） ===== */
 const TEAM_COLORS = {
   "大輔チーム":       "#2a7cff",
   "しげチーム":       "#36b24a",
@@ -80,25 +82,17 @@ const TEAM_COLORS = {
   "やや上チーム":     "#9b7cff",
   "新人チーム":       "#7fd3ff"
 };
-
-/* 既存 COLORS はそのまま残してOK（未定義チームの保険） */
-const COLORS = ['#2a7cff','#36b24a','#e0b300','#ff8a3d','#ff5db1','#ff3b30',
-                '#a0a0a8','#9b7cff','#7fd3ff','#9ad67e','#ff8ecf','#ffd166'];
-
-/* 色の取り出し（まずチーム名→無ければ配列色） */
-const colorOf = (team, i) => TEAM_COLORS[team] ?? COLORS[i % COLORS.length];
-
-  
-/* ===== 表示色（必要に応じて増やせます） ===== */
-const COLORS = ['#2a7cff','#36b24a','#e0b300','#ff8a3d','#ff5db1','#ff3b30',
-                '#a0a0a8','#9b7cff','#7fd3ff','#9ad67e','#ff8ecf','#ffd166'];
+/* 未定義チームの保険色 */
+const PALETTE = ['#2a7cff','#36b24a','#e0b300','#ff8a3d','#ff5db1','#ff3b30',
+                 '#a0a0a8','#9b7cff','#7fd3ff','#9ad67e','#ff8ecf','#ffd166'];
+const colorOf = (team,i)=> TEAM_COLORS[team] ?? PALETTE[i % PALETTE.length];
 
 /* ===== CSVユーティリティ ===== */
 const withBust = u => u + (u.includes('?') ? '&' : '?') + 'v=' + Date.now();
 function parseCSV(t){
   const r=[]; const L=t.replace(/\r/g,'').split('\n').filter(x=>x.trim());
   for(const line of L){
-    const row=[]; let s='', q=false;
+    const row=[]; let s='',q=false;
     for(let i=0;i<line.length;i++){
       const c=line[i];
       if(c==='"'){ if(q && line[i+1]==='"'){ s+='"'; i++; } else q=!q; }
@@ -111,11 +105,11 @@ function parseCSV(t){
 }
 async function fetchCSV(u){
   const res = await fetch(withBust(u), {cache:'no-store'});
-  if(!res.ok) throw new Error('CSV fetch failed');
+  if(!res.ok) throw new Error('CSV fetch failed: '+u);
   return parseCSV(await res.text());
 }
 
-/* ===== チームCSV → 選手→チーム マップ ===== */
+/* ===== チームCSV → 選手→チーム ===== */
 function playerToTeamMap(teamRows){
   const H=teamRows[0]||[];
   const idx={team:-1, p:[-1,-1,-1,-1]};
@@ -138,17 +132,14 @@ function playerToTeamMap(teamRows){
   return map;
 }
 
-/* ===== スコアCSV → 試合ごと集計 =====
-   - perGameTeam[g][team] = その試合の合計
-   - seriesAcc/seriesDelta を返す（どちらも 1..latest の長さ）
-================================================ */
+/* ===== スコアCSV → 試合ごと集計 ===== */
 function aggregateByGame(scoreRows, p2t){
   const H=scoreRows[0]||[];
   let cGame=-1,cName=-1,cPt=-1;
   H.forEach((v,i)=>{
     const s=String(v||'').replace(/\s/g,'');
     if(/^試合$|^試合番号$|^game$/i.test(s)) cGame=i;
-    if(/^選手名$|^選手$|name$/i.test(s))    cName=i;
+    if(/^選手名$|^選手$|^name$/i.test(s))  cName=i;
     if(/^得点$|^pt$|ポイント|score$/i.test(s)) cPt=i;
   });
 
@@ -161,23 +152,20 @@ function aggregateByGame(scoreRows, p2t){
     const pt = Number(String(r[cPt]||'').replace(/[^\-\d.]/g,''));
     if(!g || !nm || !isFinite(pt)) return;
     const team = p2t.get(nm);
-    if(!team) return; // 登録外は無視
+    if(!team) return;
     if(!perGameTeam.has(g)) perGameTeam.set(g,new Map());
     const m = perGameTeam.get(g);
     m.set(team, (m.get(team)||0) + pt);
     if(g>latest) latest=g;
   });
 
-  // 出現した全チーム
   const teamSet = new Set();
   for(const m of perGameTeam.values()) for(const t of m.keys()) teamSet.add(t);
   const teams = Array.from(teamSet);
 
-  // 初期配列
   const seriesDelta = new Map(teams.map(t=>[t, Array(latest).fill(0)]));
   const seriesAcc   = new Map(teams.map(t=>[t, Array(latest).fill(0)]));
 
-  // 試合ごと→各チームの delta / acc を構築
   const run = Object.fromEntries(teams.map(t=>[t,0]));
   for(let g=1; g<=latest; g++){
     const m = perGameTeam.get(g) || new Map();
@@ -191,7 +179,7 @@ function aggregateByGame(scoreRows, p2t){
   return { teams, latestGame: latest, seriesDelta, seriesAcc };
 }
 
-/* ====== Chart.js 描画 ====== */
+/* ===== Chart.js 描画 ===== */
 let chart;
 function drawChart({teams, latestGame, series, mode}){
   const labels = Array.from({length: Math.max(latestGame,1)}, (_,i)=> i+1);
@@ -200,16 +188,13 @@ function drawChart({teams, latestGame, series, mode}){
   const datasets = teams.map((t,i)=>({
     label: t,
     data: (series.get(t)||[]).map((y,x)=>({x:x+1,y})),
--   borderColor: COLORS[i % COLORS.length],
--   backgroundColor: COLORS[i % COLORS.length],
-+   borderColor: colorOf(t,i),
-+   backgroundColor: colorOf(t,i),
+    borderColor: colorOf(t,i),
+    backgroundColor: colorOf(t,i),
     tension: 0.25,
     pointRadius: 1.6,
     pointHitRadius: 8,
     borderWidth: 2,
-    spanGaps: true,
-    hidden: false
+    spanGaps: true
   }));
 
   if(chart) chart.destroy();
@@ -229,29 +214,20 @@ function drawChart({teams, latestGame, series, mode}){
         }
       },
       scales: {
-        x: {
-          title: { display:true, text:'試合' },
-          ticks: { autoSkip:true, maxTicksLimit: 10 },
-          suggestedMin: 1,
-          max: latestGame // 右端＝最新試合
-        },
-        y: {
-          title: { display:true, text: (mode==='acc'?'ポイント（累計）':'ポイント（各試合）') },
-          grid: { color:'rgba(255,255,255,.08)' }
-        }
+        x: { title: { display:true, text:'試合' }, ticks:{ autoSkip:true, maxTicksLimit:10 }, suggestedMin:1, max: latestGame },
+        y: { title: { display:true, text: (mode==='acc'?'ポイント（累計）':'ポイント（各試合）') },
+             grid: { color:'rgba(255,255,255,.08)' } }
       }
     }
   });
 
-  // 上部の簡易チップ（タップで凡例ON/OFF）
+  // 上部チップ
   const bar = document.getElementById('legendChips');
   bar.innerHTML = '';
   teams.forEach((t,i)=>{
     const chip = document.createElement('button');
     chip.className = 'chip';
-    - chip.style.borderColor = COLORS[i % COLORS.length];
-+ chip.style.borderColor = colorOf(t,i);
-
+    chip.style.borderColor = colorOf(t,i);
     chip.style.color = '#fff';
     chip.style.background = 'transparent';
     chip.textContent = t;
@@ -265,7 +241,7 @@ function drawChart({teams, latestGame, series, mode}){
   });
 }
 
-/* ====== ロード＆更新 ====== */
+/* ===== ロード＆更新 ===== */
 async function bootstrap(){
   try{
     const [teamRows, scoreRows] = await Promise.all([
@@ -275,7 +251,7 @@ async function bootstrap(){
     const p2t = playerToTeamMap(teamRows);
     const agg = aggregateByGame(scoreRows, p2t);
 
-    const mode = document.getElementById('mode').value; // 'acc' or 'delta'
+    const mode = document.getElementById('mode').value; // 'acc' | 'delta'
     const series = (mode==='acc') ? agg.seriesAcc : agg.seriesDelta;
 
     drawChart({teams: agg.teams, latestGame: agg.latestGame, series, mode});
@@ -290,6 +266,5 @@ window.addEventListener('load', bootstrap);
 document.getElementById('reload').addEventListener('click', bootstrap);
 document.getElementById('mode').addEventListener('change', bootstrap);
 </script>
-
 </body>
 </html>
